@@ -67,21 +67,14 @@ app.get('/getAllCouponsFromStore', function (req, res) {
 })
 
 //insert new coupon in store
-app.get('/addCouponFromStore', function (req, res) {
+app.post('/addCouponFromStore', function (req, res) {
   var reduction = req.body.reduction;
   var delai = req.body.delai;
   var quantite = req.body.quantite;
+  var id_magasin = req.body.id_magasin;
 
-db.run("INSERT into coupon(reduction,delai,quantite) VALUES ('"+nom_magasin+"','"+code+"','null')");
-    if(rows !== undefined)
-    {
-      res.send(rows);
-    }
-    else
-    {
-      throw err;
-    }
-  });
+    db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
+    res.send("ok");
 })
 
 //Connexion
