@@ -77,6 +77,30 @@ app.post('/addCouponFromStore', function (req, res) {
     res.send("ok");
 })
 
+//select all coupons from user
+app.get('/getAllCouponsFromUser', function (req, res) {
+
+  db.all("SELECT id_utilisateur, nom, reduction, delai FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur != '"+null+"'",function(err,rows){
+    if(rows !== undefined)
+    {
+      res.send(rows);
+    }
+    else
+    {
+      throw err;
+    }
+  });
+})
+
+//insert new coupon in store
+app.post('/addCouponFromUser', function (req, res) {
+  var id_coupon = req.body.id_coupon;
+  var id_utilisateur = req.body.id_utilisateur;
+
+    db.run("UPDATE Coupon SET id_utilisateur='"+id_utilisateur+"' WHERE id_coupon='"+id_coupon+"'");
+    res.send("ok");
+})
+
 //Connexion
 app.get('/login', function (req, res) {
   var identifiant = req.body.identifiant;
