@@ -81,7 +81,7 @@ app.post('/addCouponFromStore', function (req, res) {
 app.get('/getMyCoupons', function (req, res) {
   var id_utilisateur = req.body.id_utilisateur;
 
-  db.all("SELECT nom, reduction, delai FROM Coupon_utilisateur JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rows){
+  db.all("SELECT nom, reduction, delai FROM Coupon_utilisateur JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur='"+id_utilisateur+"' AND type=0",function(err,rows){
     if(rows !== undefined)
     {
       res.send(rows);
@@ -96,7 +96,7 @@ app.get('/getMyCoupons', function (req, res) {
 //select all coupons from user
 app.get('/getAllCouponsFromUser', function (req, res) {
   //NEED SECURITY CHECK IF USER HAS COUPON
-  db.all("SELECT id_utilisateur, nom, reduction, delai FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur != '"+null+"'",function(err,rows){
+    db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
     if(rows !== undefined)
     {
       res.send(rows);
@@ -113,7 +113,7 @@ app.post('/addCouponFromUser', function (req, res) {
   var id_coupon = req.body.id_coupon;
   var id_utilisateur = req.body.id_utilisateur;
 
-  db.run("UPDATE Coupon SET id_utilisateur='"+id_utilisateur+"' WHERE id_coupon='"+id_coupon+"'");
+  db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
   res.send("ok");
 })
 
@@ -135,7 +135,7 @@ app.post('/takeCoupon', function (req, res) {
           quantite -= 1; //We get one
           db.run("UPDATE Coupon SET quantite='"+quantite+"' WHERE id_coupon='"+id_coupon+"'");
           //We add the coupon in our user database
-          db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur)  VALUES('"+id_coupon+"','"+id_utilisateur+"')");
+          db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur, type)  VALUES('"+id_coupon+"','"+id_utilisateur+"', 0)"); //0 = my coupon
           res.send("ok");
         }
         else {
@@ -154,19 +154,27 @@ app.get('/login', function (req, res) {
   var identifiant = req.body.identifiant;
   var mot_de_passe = req.body.mot_de_passe;
 
-  db.all("SELECT * from Utilisateur where identifiant="+identifiant+" AND mot_de_passe="+mot_de_passe,function(err,rows){
+  db.all("SELECT * FROM Utilisateur WHERE identifiant="+identifiant+" AND mot_de_passe="+mot_de_passe,function(err,rows){
     //rows contain values while errors, well you can figure out.
     if(rows.length !== 0)
     {
+      //Si les informations de connexion sont bonnes
+
       res.send('ok');
     }
     else {
       res.send('identifiant ou mot de passe incorrect.');
     }
   });
+})
 
-  //Si les informations de connexion sont bonnes
+//Delete account
+app.delete('/delete', function (req, res) {
+  var id_utilisateur = req.body.id_utilisateur;
 
+  db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
+      res.send('ok');
+  });
 })
 
 function generateCode()
