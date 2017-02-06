@@ -18,7 +18,6 @@ app.post('/createStore', function (req, res) {
 
   //Check if magasin exist already
   db.all("SELECT * FROM Magasin WHERE nom='"+nom_magasin+"'",function(err,rows){
-    //rows contain values while errors, well you can figure out.
     if(rows !== undefined && rows.length == 0)
     {
       //Genere code for magasin admin to give to magasin owner
@@ -245,6 +244,22 @@ function genrateToken()
     tokenGenerate += characters.charAt(nbAlea);
   }
   return  tokenGenerate;
+}
+//TODO IMPLEMENTE ALL FUNCTION USING TOKEN INSTEAD OF USER ID
+function checkToken(token)
+{
+  //We check if the token is in the database
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token="+token,function(err,rows){
+    if(rows === undefined || rows.length == 0)
+    {
+      //The token is not in the database
+      return false;
+    }
+    else {
+      //The token is in the dabase
+      return rows[0].id_utilisateur;
+    }
+  });
 }
 
 app.listen(3000, function () {
