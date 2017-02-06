@@ -204,13 +204,20 @@ app.get('/login', function (req, res) {
       }
       else {
         var token = generateToken();
-        db.run("UPDATE Utilsateur SET token='"+token+"' WHERE id_utilisateur='"+rows[0].id_utilisateur+"'");
+        db.run("UPDATE Utilisateur SET token='"+token+"' WHERE id_utilisateur='"+rows[0].id_utilisateur+"'");
       }
     }
     else {
       res.send('identifiant ou mot de passe incorrect.');
     }
   });
+})
+
+//Disconnect
+app.get('/disconnect', function (req, res) {
+  var id_utilisateur = req.body.id_utilisateur;
+  db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
+  res.send('Déconnecté!');
 })
 
 //Delete account
