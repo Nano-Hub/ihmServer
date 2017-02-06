@@ -78,9 +78,7 @@ app.post('/deleteCouponFromStore', function (req, res) {
   });
 })
 
-
-
-//-----------------------------------USER METHOD--------------------------
+//-----------------------------------USER METHOD--FIRST MARKET--------------------------
 //select all coupons from store
 app.get('/getAllCouponsFromStore', function (req, res) {
 
@@ -99,7 +97,7 @@ app.get('/getAllCouponsFromStore', function (req, res) {
 //select all  my coupon
 app.get('/getMyCoupons', function (req, res) {
   var id_utilisateur = req.body.id_utilisateur;
-
+//type = 0 mycoupon
   db.all("SELECT nom, reduction, delai FROM Coupon_utilisateur JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur='"+id_utilisateur+"' AND type=0",function(err,rows){
     if(rows !== undefined)
     {
@@ -112,30 +110,6 @@ app.get('/getMyCoupons', function (req, res) {
   });
 })
 
-//select all coupons from user
-app.get('/getAllCouponsFromUser', function (req, res) {
-  //NEED SECURITY CHECK IF USER HAS COUPON
-  db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
-    if(rows !== undefined)
-    {
-      res.send(rows);
-    }
-    else
-    {
-      throw err;
-    }
-  });
-})
-
-//insert new coupon from a user
-app.post('/addCouponFromUser', function (req, res) {
-  var id_coupon = req.body.id_coupon;
-  var id_utilisateur = req.body.id_utilisateur;
-
-  db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
-  res.send("ok");
-})
-
 //insert new coupon from a user
 app.post('/takeCoupon', function (req, res) {
   var id_coupon = req.body.id_coupon;
@@ -145,7 +119,7 @@ app.post('/takeCoupon', function (req, res) {
   db.all("SELECT quantite FROM Coupon WHERE id_coupon="+id_coupon+";",function(err,rows){
     //get the number of coupon
     var quantite = rows[0].quantite;
-    if(quantite > 0) //if there is enought coupon
+    if(quantite > 0 || quantite == "-1") //if there is enought coupon or unlimited (-1)
     {
       //we check if the user doesn't have already one coupon of this kind
       db.all("SELECT id_coupon FROM Coupon_utilisateur WHERE id_utilisateur="+id_utilisateur+" AND id_coupon="+id_coupon+";",function(err,rowsCoupon){
@@ -166,6 +140,51 @@ app.post('/takeCoupon', function (req, res) {
       res.send("Il n'y pas de coupon disponible.");
     }
   });
+})
+
+
+//-------------------------------------USER-METHODE - 2 nd MARKET-------------------------------------
+
+//select all coupons from user
+app.get('/getAllCouponsFromUser', function (req, res) {
+  //TODO NEED SECURITY CHECK IF USER HAS COUPON
+  //type = 1 , coupon offered by user
+  db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
+    if(rows !== undefined)
+    {
+      res.send(rows);
+    }
+    else
+    {
+      throw err;
+    }
+  });
+})
+
+//insert new coupon from a user (give a coupon)
+app.post('/addCouponFromUser', function (req, res) {
+  var id_coupon = req.body.id_coupon;
+  var id_utilisateur = req.body.id_utilisateur;
+  // type = 1 coupon offered by user
+  db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
+  res.send("ok");
+})
+
+//ask for a coupon
+app.post('/askCoupon', function (req, res) {
+  var nom_magasin = req.body.nom_magasin;
+  var id_utilisateur = req.body.id_utilisateur;
+// type = 2 coupon asked
+  db.run("UPDATE Coupon_utilisateur SET type=2 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
+  res.send("ok");
+})
+
+//get all offer that can be asked
+app.post('/getPossibleAskedOffer', function (req, res) {
+// type = 2 coupon asked && reduction - 1 = coupon pré-crée
+db.all("SELECT id_magasin, nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE reduction="-1"",function(err,rows){
+  //TODO FINIR
+  res.send("ok");
 })
 
 //-------------------------------------ACCOUNT------------------------------
@@ -241,7 +260,7 @@ function generateCode()
   return  codeGenerate;
 }
 
-function genrateToken()
+function generateToken()
 {
   var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
   var tokenGenerate = '';
