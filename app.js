@@ -73,13 +73,29 @@ app.post('/addCouponFromStore', function (req, res) {
   var quantite = req.body.quantite;
   var id_magasin = req.body.id_magasin;
 
-    db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
-    res.send("ok");
+  db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
+  res.send("ok");
+})
+
+//select all  my coupon
+app.get('/getMyCoupons', function (req, res) {
+  var id_utilisateur = req.body.id_utilisateur;
+
+  db.all("SELECT nom, reduction, delai FROM Coupon_utilisateur JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rows){
+    if(rows !== undefined)
+    {
+      res.send(rows);
+    }
+    else
+    {
+      throw err;
+    }
+  });
 })
 
 //select all coupons from user
 app.get('/getAllCouponsFromUser', function (req, res) {
-
+  //NEED SECURITY CHECK IF USER HAS COUPON
   db.all("SELECT id_utilisateur, nom, reduction, delai FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur != '"+null+"'",function(err,rows){
     if(rows !== undefined)
     {
@@ -92,13 +108,45 @@ app.get('/getAllCouponsFromUser', function (req, res) {
   });
 })
 
-//insert new coupon in store
+//insert new coupon from a user
 app.post('/addCouponFromUser', function (req, res) {
   var id_coupon = req.body.id_coupon;
   var id_utilisateur = req.body.id_utilisateur;
 
-    db.run("UPDATE Coupon SET id_utilisateur='"+id_utilisateur+"' WHERE id_coupon='"+id_coupon+"'");
-    res.send("ok");
+  db.run("UPDATE Coupon SET id_utilisateur='"+id_utilisateur+"' WHERE id_coupon='"+id_coupon+"'");
+  res.send("ok");
+})
+
+//insert new coupon from a user
+app.post('/takeCoupon', function (req, res) {
+  var id_coupon = req.body.id_coupon;
+  var id_utilisateur = req.body.id_utilisateur;
+
+
+  db.all("SELECT quantite FROM Coupon WHERE id_coupon="+id_coupon+";",function(err,rows){
+    //get the number of coupon
+    var quantite = rows[0].quantite;
+    if(quantite > 0) //if there is enought coupon
+    {
+      //we check if the user doesn't have already one coupon of this kind
+      db.all("SELECT id_coupon FROM Coupon_utilisateur WHERE id_utilisateur="+id_utilisateur+" AND id_coupon="+id_coupon+";",function(err,rowsCoupon){
+        if(rowsCoupon.length === 0)
+        {
+          quantite -= 1; //We get one
+          db.run("UPDATE Coupon SET quantite='"+quantite+"' WHERE id_coupon='"+id_coupon+"'");
+          //We add the coupon in our user database
+          db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur)  VALUES('"+id_coupon+"','"+id_utilisateur+"')");
+          res.send("ok");
+        }
+        else {
+          res.send("Vous avez déjà un exemplaire de ce coupon.")
+        }
+      });
+    }
+    else {
+      res.send("Il n'y pas de coupon disponible.");
+    }
+  });
 })
 
 //Connexion
