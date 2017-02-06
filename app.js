@@ -9,25 +9,8 @@ var bodyParser = require('body-parser');
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
-//INSCRIPTION | CONNEXION
-//Inscription
-app.post('/register', function (req, res) {
-  var identifiant = req.body.identifiant;
-  var mot_de_passe = req.body.mot_de_passe;
-  var code_magasin = req.body.code_magasin;
 
-  if(code_magasin == "null")
-  {
-    db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin) " +
-    "VALUES ('"+identifiant+"','"+mot_de_passe+"','0')");
-  }
-  else
-  {
-    //Obtenir le magasin correspondant au code ou retourner null
-  }
-
-  res.send('Hello World!');
-})
+//-----------------------------------METHOD FOR ADMIN OR SELLER--------------------------------
 
 //createMagasin
 app.post('/createStore', function (req, res) {
@@ -51,21 +34,6 @@ app.post('/createStore', function (req, res) {
   });
 })
 
-//select all coupons from store
-app.get('/getAllCouponsFromStore', function (req, res) {
-
-  db.all("SELECT nom, reduction, delai, quantite FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin",function(err,rows){
-    if(rows !== undefined)
-    {
-      res.send(rows);
-    }
-    else
-    {
-      throw err;
-    }
-  });
-})
-
 //insert new coupon in store
 app.post('/addCouponFromStore', function (req, res) {
   var reduction = req.body.reduction;
@@ -75,6 +43,23 @@ app.post('/addCouponFromStore', function (req, res) {
 
   db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
   res.send("ok");
+})
+
+
+//-----------------------------------USER METHOD--------------------------
+//select all coupons from store
+app.get('/getAllCouponsFromStore', function (req, res) {
+
+  db.all("SELECT nom, reduction, delai, quantite, image FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin",function(err,rows){
+    if(rows !== undefined)
+    {
+      res.send(rows);
+    }
+    else
+    {
+      throw err;
+    }
+  });
 })
 
 //select all  my coupon
@@ -149,6 +134,26 @@ app.post('/takeCoupon', function (req, res) {
   });
 })
 
+//-------------------------------------ACCOUNT------------------------------
+//Inscription
+app.post('/register', function (req, res) {
+  var identifiant = req.body.identifiant;
+  var mot_de_passe = req.body.mot_de_passe;
+  var code_magasin = req.body.code_magasin;
+
+  if(code_magasin == "null")
+  {
+    db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin) " +
+    "VALUES ('"+identifiant+"','"+mot_de_passe+"','0')");
+  }
+  else
+  {
+    //Obtenir le magasin correspondant au code ou retourner null
+  }
+
+  res.send('Hello World!');
+})
+
 //Connexion
 app.get('/login', function (req, res) {
   var identifiant = req.body.identifiant;
@@ -159,8 +164,14 @@ app.get('/login', function (req, res) {
     if(rows.length !== 0)
     {
       //Si les informations de connexion sont bonnes
-
-      res.send('ok');
+      if(rows[0].token == "null")
+      {
+        res.send(rows[0].token);
+      }
+      else {
+        var token = generateToken();
+        db.run("UPDATE Utilsateur SET token='"+token+"' WHERE id_utilisateur='"+rows[0].id_utilisateur+"'");
+      }
     }
     else {
       res.send('identifiant ou mot de passe incorrect.');
@@ -180,8 +191,20 @@ app.delete('/delete', function (req, res) {
 function generateCode()
 {
   var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  var tokenGenerate = '';
+  var codeGenerate = '';
   for(var i = 0; i< 8; i++)
+  {
+    var nbAlea = Math.random()*25;
+    codeGenerate += characters.charAt(nbAlea);
+  }
+  return  codeGenerate;
+}
+
+function genrateToken()
+{
+  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+  var tokenGenerate = '';
+  for(var i = 0; i< 20; i++)
   {
     var nbAlea = Math.random()*25;
     tokenGenerate += characters.charAt(nbAlea);
@@ -190,7 +213,7 @@ function generateCode()
 }
 
 app.listen(3000, function () {
-  console.log('Example app listening on port 3000!');
+  console.log('Your incredible app is listening on port 3000!');
 })
 
 
