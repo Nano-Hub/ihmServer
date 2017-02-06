@@ -156,8 +156,13 @@ app.get('/login', function (req, res) {
 
   db.all("SELECT * from Utilisateur where identifiant="+identifiant+" AND mot_de_passe="+mot_de_passe,function(err,rows){
     //rows contain values while errors, well you can figure out.
-    if(rows =="")
-    res.send('ok');
+    if(rows.length !== 0)
+    {
+      res.send('ok');
+    }
+    else {
+      res.send('identifiant ou mot de passe incorrect.');
+    }
   });
 
   //Si les informations de connexion sont bonnes
