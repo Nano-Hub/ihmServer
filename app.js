@@ -39,11 +39,46 @@ app.post('/addCouponFromStore', function (req, res) {
   var reduction = req.body.reduction;
   var delai = req.body.delai;
   var quantite = req.body.quantite;
-  var id_magasin = req.body.id_magasin;
+  var id_utilisateur = req.body.id_utilisateur;
 
-  db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
-  res.send("ok");
+  //We check if the user own a store
+  db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rows){
+    if(rows[0].id_magasin !== "null")
+    {
+      db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
+      res.send("ok");
+    }
+  });
+
 })
+
+//delete a coupon in store
+app.post('/deleteCouponFromStore', function (req, res) {
+  var id_coupon = req.body.id_magasin;
+  var id_utilisateur = req.body.id_utilisateur;
+
+  //We check if the user is the owner of the store
+  db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rows){
+    if(rows[0].id_magasin !== "null")
+    {
+      //We check if the coupon is for THIS store
+      db.all("SELECT id_magasin FROM Coupon WHERE id_coupon='"+id_coupon+"'",function(err,rowsCoupon){
+        if(rowsCoupon[0].id_magasin !== undefined && rowsCoupon[0].id_magasin == rows[0].id_magasin !== "null")
+        {
+          db.run("DELETE FROM Coupon WHERE id_coupon ='"+id_coupon);
+          res.send("Coupon supprimé");
+        }
+        else {
+          res.send("Le coupon n'appartient a votre magasin.");
+        }
+      });
+    }
+    else {
+      res.send("Ce magasin n'est pas le votre!");
+    }
+  });
+})
+
 
 
 //-----------------------------------USER METHOD--------------------------
@@ -81,7 +116,7 @@ app.get('/getMyCoupons', function (req, res) {
 //select all coupons from user
 app.get('/getAllCouponsFromUser', function (req, res) {
   //NEED SECURITY CHECK IF USER HAS COUPON
-    db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
+  db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
     if(rows !== undefined)
     {
       res.send(rows);
@@ -184,7 +219,7 @@ app.delete('/delete', function (req, res) {
   var id_utilisateur = req.body.id_utilisateur;
 
   db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
-      res.send('ok');
+    res.send('ok');
   });
 })
 
