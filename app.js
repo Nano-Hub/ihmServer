@@ -115,7 +115,7 @@ app.delete('/deleteCouponFromStore', function (req, res) {
 //select all coupons from store
 app.get('/getAllCouponsFromStore', function (req, res) {
 
-  db.all("SELECT nom, reduction, delai, quantite, image FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin",function(err,rows){
+  db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin",function(err,rows){
     if(rows !== undefined)
     {
       res.status(200).send(rows);
@@ -159,40 +159,45 @@ app.get('/getMyCoupons', function (req, res) {
 //insert new coupon from a user
 app.post('/takeCoupon', function (req, res) {
   var id_coupon = req.body.id_coupon;
+  console.log(id_coupon);
   var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      //The token is in the database
+      var id_utilisateur = rows[0].id_utilisateur;
 
-  if(id_utilisateur != false)
-  {
-    db.all("SELECT quantite FROM Coupon WHERE id_coupon="+id_coupon+";",function(err,rows){
-      //get the number of coupon
-      var quantite = rows[0].quantite;
-      if(quantite > 0 || quantite == "-1") //if there is enought coupon or unlimited (-1)
-      {
-        //we check if the user doesn't have already one coupon of this kind
-        db.all("SELECT id_coupon FROM Coupon_utilisateur WHERE id_utilisateur="+id_utilisateur+" AND id_coupon="+id_coupon+";",function(err,rowsCoupon){
-          if(rowsCoupon.length === 0)
-          {
-            quantite -= 1; //We get one
-            db.run("UPDATE Coupon SET quantite='"+quantite+"' WHERE id_coupon='"+id_coupon+"'");
-            //We add the coupon in our user database
-            db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur, type)  VALUES('"+id_coupon+"','"+id_utilisateur+"', 0)"); //0 = my coupon
-            res.status(201).send("ok");
-          }
-          else {
-            res.status(400).send("Vous avez déjà un exemplaire de ce coupon.")
-          }
-        });
-      }
-      else {
-        res.status(400).send("Il n'y pas de coupon disponible.");
-      }
-    });
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
+      db.all("SELECT quantite FROM Coupon WHERE id_coupon="+id_coupon+";",function(err,rows){
+        //get the number of coupon
+        var quantite = rows[0].quantite;
+        if(quantite > 0 || quantite == "-1") //if there is enought coupon or unlimited (-1)
+        {
+          //we check if the user doesn't have already one coupon of this kind
+          db.all("SELECT id_coupon FROM Coupon_utilisateur WHERE id_utilisateur="+id_utilisateur+" AND id_coupon="+id_coupon+";",function(err,rowsCoupon){
+            if(rowsCoupon.length === 0)
+            {
+              quantite -= 1; //We get one
+              db.run("UPDATE Coupon SET quantite='"+quantite+"' WHERE id_coupon='"+id_coupon+"'");
+              //We add the coupon in our user database
+              db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur, type)  VALUES('"+id_coupon+"','"+id_utilisateur+"', 0)"); //0 = my coupon
+              res.status(201).send("ok");
+            }
+            else {
+              res.status(400).send("Vous avez déjà un exemplaire de ce coupon.")
+            }
+          });
+        }
+        else {
+          res.status(400).send("Il n'y pas de coupon disponible.");
+        }
+      });
+    }
+  })
 })
 
 
@@ -287,6 +292,26 @@ app.post('/addCouponFromUser', function (req, res) {
       var id_utilisateur = rows[0].id_utilisateur;
       // type = 1 coupon offered by user
       db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
+      res.status(201).send("ok");
+    }
+  });
+})
+
+//insert new coupon from a user (give a coupon)
+app.post('/stopGivingCoupon', function (req, res) {
+  var id_coupon = req.body.id_coupon;
+  var token = req.body.token;
+
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      var id_utilisateur = rows[0].id_utilisateur;
+      // type = 1 coupon offered by user
+      db.run("UPDATE Coupon_utilisateur SET type=0 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
       res.status(201).send("ok");
     }
   });
@@ -391,33 +416,39 @@ app.post('/login', function (req, res) {
 app.post('/disconnect', function (req, res) {
   var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
-  {
-    db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
-    res.status(201).send('ok');
-  }
-  else {
-    res.status(401).send("Erreur!");
-  }
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else
+    {
+      db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
+      res.status(201).send('ok');
+    }
+  });
 })
 
 //Delete account
 app.delete('/delete', function (req, res) {
   var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
-  {
-    db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
-      res.status(200).send('ok');
-    });
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else
+    {
+      //The token is in the database
+      var id_utilisateur = rows[0].id_utilisateur;
+      db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
+        res.status(200).send('ok');
+      });
+    }
+  });
 })
 
 function generateCode()
