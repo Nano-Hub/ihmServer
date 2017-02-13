@@ -237,7 +237,7 @@ app.post('/askCoupon', function (req, res) {
 app.get('/getPossibleAskedOffer', function (req, res) {
   // type = 2 coupon asked && reduction - 1 = coupon pré-crée
   db.all("SELECT id_magasin, nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE reduction=-1",function(err,rows){
-    res.status(200).(rows);
+    res.status(200).send(rows);
   })
 })
 
@@ -253,7 +253,7 @@ app.post('/register', function (req, res) {
   if(code_magasin == "null")
   {
     db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin, token) VALUES ('"+identifiant+"','"+mot_de_passe+"','-1', '"+token+"')");
-    res.status(200).("ok");
+    res.status(200).send("ok");
   }
   else
   {
@@ -262,10 +262,10 @@ app.post('/register', function (req, res) {
       if(rows.length !== 0)
       {
         db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin,token) VALUES ('"+identifiant+"','"+mot_de_passe+"','"+rows[0].id_magasin+"', '"+token+"')");
-        res.status(200).("ok");
+        res.status(200).send("ok");
       }
       else {
-        res.status(401).("Erreur: Code faux!")
+        res.status(401).send("Erreur: Code faux!")
       }
     })
   }
@@ -291,7 +291,7 @@ app.post('/login', function (req, res) {
       }
     }
     else {
-      res.status(400).('identifiant ou mot de passe incorrect.');
+      res.status(400).send('identifiant ou mot de passe incorrect.');
     }
   });
 })
