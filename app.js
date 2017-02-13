@@ -27,11 +27,11 @@ app.post('/createStore', function (req, res) {
       db.all("SELECT id_magasin FROM Magasin WHERE nom='"+nom_magasin+"'",function(err,rows){
         db.run("INSERT into Coupon(reduction,delai,quantite, id_magasin) VALUES (-1,-1,-1,'"+rows[0].id_magasin+"')");
       })
-      res.send('ok');
+      res.status(200).send('ok');
     }
     else //if the store already exists
     {
-      res.send('not ok');
+      res.status(400).send('Store already exist');
     }
   });
 })
@@ -52,12 +52,12 @@ app.post('/addCouponFromStore', function (req, res) {
       if(rows[0].id_magasin !== "null")
       {
         db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
-        res.send("ok");
+        res.status(200).send("ok");
       }
     });
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 
 })
@@ -80,20 +80,20 @@ app.delete('/deleteCouponFromStore', function (req, res) {
           if(rowsCoupon[0].id_magasin !== undefined && rowsCoupon[0].id_magasin == rows[0].id_magasin !== "null")
           {
             db.run("DELETE FROM Coupon WHERE id_coupon ='"+id_coupon);
-            res.send("Coupon supprimé");
+            res.status(200).send("Coupon supprimé");
           }
           else {
-            res.send("Le coupon n'appartient a votre magasin.");
+            res.status(400).send("Le coupon n'appartient a votre magasin.");
           }
         });
       }
       else {
-        res.send("Ce magasin n'est pas le votre!");
+        res.status(400).send("Ce magasin n'est pas le votre!");
       }
     });
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 })
 
@@ -104,11 +104,11 @@ app.get('/getAllCouponsFromStore', function (req, res) {
   db.all("SELECT nom, reduction, delai, quantite, image FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin",function(err,rows){
     if(rows !== undefined)
     {
-      res.send(rows);
+      res.status(200).send(rows);
     }
     else
     {
-      throw err;
+      res.status(400).send(err);
     }
   });
 })
@@ -125,16 +125,16 @@ app.get('/getMyCoupons', function (req, res) {
     db.all("SELECT nom, reduction, delai FROM Coupon_utilisateur JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur='"+id_utilisateur+"' AND type=0",function(err,rows){
       if(rows !== undefined)
       {
-        res.send(rows);
+        res.status(200).send(rows);
       }
       else
       {
-        throw err;
+        res.status(400).send(err);
       }
     });
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 })
 
@@ -160,20 +160,20 @@ app.post('/takeCoupon', function (req, res) {
             db.run("UPDATE Coupon SET quantite='"+quantite+"' WHERE id_coupon='"+id_coupon+"'");
             //We add the coupon in our user database
             db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur, type)  VALUES('"+id_coupon+"','"+id_utilisateur+"', 0)"); //0 = my coupon
-            res.send("ok");
+            res.status(201).send("ok");
           }
           else {
-            res.send("Vous avez déjà un exemplaire de ce coupon.")
+            res.status(400).send("Vous avez déjà un exemplaire de ce coupon.")
           }
         });
       }
       else {
-        res.send("Il n'y pas de coupon disponible.");
+        res.status(400).send("Il n'y pas de coupon disponible.");
       }
     });
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 })
 
@@ -187,11 +187,11 @@ app.get('/getAllCouponsFromUser', function (req, res) {
   db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
     if(rows !== undefined)
     {
-      res.send(rows);
+      res.status(200).send(rows);
     }
     else
     {
-      throw err;
+      res.status(400).send(err);
     }
   });
 })
@@ -207,10 +207,10 @@ app.post('/addCouponFromUser', function (req, res) {
   {
     // type = 1 coupon offered by user
     db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
-    res.send("ok");
+    res.status(201).send("ok");
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 })
 
@@ -225,11 +225,11 @@ app.post('/askCoupon', function (req, res) {
   {
     // type = 2 coupon asked
     db.run("UPDATE Coupon_utilisateur SET type=2 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
-    res.send("ok");
+    res.status(201).send("ok");
     //TODO CORRIGER
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 })
 
@@ -237,7 +237,7 @@ app.post('/askCoupon', function (req, res) {
 app.get('/getPossibleAskedOffer', function (req, res) {
   // type = 2 coupon asked && reduction - 1 = coupon pré-crée
   db.all("SELECT id_magasin, nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE reduction=-1",function(err,rows){
-    res.send(rows);
+    res.status(200).(rows);
   })
 })
 
@@ -253,7 +253,7 @@ app.post('/register', function (req, res) {
   if(code_magasin == "null")
   {
     db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin, token) VALUES ('"+identifiant+"','"+mot_de_passe+"','-1', '"+token+"')");
-    res.send("ok");
+    res.status(200).("ok");
   }
   else
   {
@@ -262,10 +262,10 @@ app.post('/register', function (req, res) {
       if(rows.length !== 0)
       {
         db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin,token) VALUES ('"+identifiant+"','"+mot_de_passe+"','"+rows[0].id_magasin+"', '"+token+"')");
-        res.send("ok");
+        res.status(200).("ok");
       }
       else {
-        res.send("Erreur: Code faux!")
+        res.status(401).("Erreur: Code faux!")
       }
     })
   }
@@ -283,7 +283,7 @@ app.post('/login', function (req, res) {
       //Si les informations de connexion sont bonnes
       if(rows[0].token == "null")
       {
-        res.send(rows[0].token);
+        res.status(200).send(rows[0].token);
       }
       else {
         var token = generateToken();
@@ -291,7 +291,7 @@ app.post('/login', function (req, res) {
       }
     }
     else {
-      res.send('identifiant ou mot de passe incorrect.');
+      res.status(400).('identifiant ou mot de passe incorrect.');
     }
   });
 })
@@ -305,10 +305,10 @@ app.post('/disconnect', function (req, res) {
   if(id_utilisateur != false)
   {
     db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
-    res.send('ok');
+    res.status(201).send('ok');
   }
   else {
-    res.send("Erreur!<");
+    res.status(401).send("Erreur!");
   }
 })
 
@@ -321,11 +321,11 @@ app.delete('/delete', function (req, res) {
   if(id_utilisateur != false)
   {
     db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
-      res.send('ok');
+      res.status(200).send('ok');
     });
   }
   else {
-    res.send("Erreur: reconnectez-vous!");
+    res.status(401).send("Erreur: reconnectez-vous!");
   }
 })
 
