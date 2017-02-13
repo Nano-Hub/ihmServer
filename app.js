@@ -63,7 +63,7 @@ app.post('/addCouponFromStore', function (req, res) {
 })
 
 //delete a coupon in store
-app.post('/deleteCouponFromStore', function (req, res) {
+app.delete('/deleteCouponFromStore', function (req, res) {
   var id_coupon = req.body.id_magasin;
   var token = req.body.token;
 
@@ -234,7 +234,7 @@ app.post('/askCoupon', function (req, res) {
 })
 
 //get all offer that can be asked
-app.post('/getPossibleAskedOffer', function (req, res) {
+app.get('/getPossibleAskedOffer', function (req, res) {
   // type = 2 coupon asked && reduction - 1 = coupon pré-crée
   db.all("SELECT id_magasin, nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE reduction=-1",function(err,rows){
     res.send(rows);
@@ -253,6 +253,7 @@ app.post('/register', function (req, res) {
   if(code_magasin == "null")
   {
     db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin, token) VALUES ('"+identifiant+"','"+mot_de_passe+"','-1', '"+token+"')");
+    res.send("ok");
   }
   else
   {
@@ -261,18 +262,17 @@ app.post('/register', function (req, res) {
       if(rows.length !== 0)
       {
         db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin,token) VALUES ('"+identifiant+"','"+mot_de_passe+"','"+rows[0].id_magasin+"', '"+token+"')");
+        res.send("ok");
       }
       else {
         res.send("Erreur: Code faux!")
       }
     })
   }
-
-  res.send('Hello World!');
 })
 
 //Connexion
-app.get('/login', function (req, res) {
+app.post('/login', function (req, res) {
   var identifiant = req.body.identifiant;
   var mot_de_passe = req.body.mot_de_passe;
 
@@ -297,7 +297,7 @@ app.get('/login', function (req, res) {
 })
 
 //Disconnect
-app.get('/disconnect', function (req, res) {
+app.post('/disconnect', function (req, res) {
   var token = req.body.token;
 
   var id_utilisateur = checkToken(token);
@@ -305,10 +305,10 @@ app.get('/disconnect', function (req, res) {
   if(id_utilisateur != false)
   {
     db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
-    res.send('Déconnecté!');
+    res.send('ok');
   }
   else {
-    res.send("Erreur!");
+    res.send("Erreur!<");
   }
 })
 
