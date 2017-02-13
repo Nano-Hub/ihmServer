@@ -42,7 +42,7 @@ app.post('/addCouponFromStore', function (req, res) {
   var delai = req.body.delai;
   var quantite = req.body.quantite;
   var token = req.body.token;
-  
+
   var id_utilisateur = checkToken(token);
 
   if(id_utilisateur != false)
@@ -248,14 +248,24 @@ app.post('/register', function (req, res) {
   var mot_de_passe = req.body.mot_de_passe;
   var code_magasin = req.body.code_magasin;
 
+  var token = generateToken();
+
   if(code_magasin == "null")
   {
-    db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin) " +
-    "VALUES ('"+identifiant+"','"+mot_de_passe+"','0')");
+    db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin, token) VALUES ('"+identifiant+"','"+mot_de_passe+"','-1', '"+token+"')");
   }
   else
   {
     //Obtenir le magasin correspondant au code ou retourner null
+    db.all("SELECT id_magasin FROM Magasin WHERE code="+code_magasin,function(err,rows){
+      if(rows.length !== 0)
+      {
+        db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin,token) VALUES ('"+identifiant+"','"+mot_de_passe+"','"+rows[0].id_magasin+"', '"+token+"')");
+      }
+      else {
+        res.send("Erreur: Code faux!")
+      }
+    })
   }
 
   res.send('Hello World!');
@@ -353,7 +363,7 @@ function checkToken(token)
       return false;
     }
     else {
-      //The token is in the dabase
+      //The token is in the database
       return rows[0].id_utilisateur;
     }
   });
