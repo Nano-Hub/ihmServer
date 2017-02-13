@@ -9,6 +9,20 @@ var bodyParser = require('body-parser');
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
+allowCrossDomain = function(req, res, next) {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+  if ('OPTIONS' === req.method) {
+    res.send(200);
+  } else {
+    next();
+  }
+};
+
+app.use(allowCrossDomain);
+
+
 
 //-----------------------------------METHOD FOR ADMIN OR SELLER--------------------------------
 
@@ -276,114 +290,126 @@ app.post('/login', function (req, res) {
   var identifiant = req.body.identifiant;
   var mot_de_passe = req.body.mot_de_passe;
 
-  db.all("SELECT * FROM Utilisateur WHERE identifiant="+identifiant+" AND mot_de_passe="+mot_de_passe,function(err,rows){
+  console.log(identifiant);
+  console.log(mot_de_passe);
+  db.all("SELECT * FROM Utilisateur WHERE identifiant='"+identifiant+"' AND mot_de_passe='"+mot_de_passe+"'",function(err,rows){
     //rows contain values while errors, well you can figure out.
     if(rows.length !== 0)
     {
       //Si les informations de connexion sont bonnes
-      if(rows[0].token == "null")
+      console.log(rows[0].token);
+      if(rows[0].token !== "NULL")
       {
-        res.status(200).send(rows[0].token);
+        var tokenObj =
+        {
+          token: rows[0].token
+        };
+        res.status(200).send(tokenObj);
       }
       else {
         var token = generateToken();
+        var tokenObj =
+        {
+          token: token
+        };
         db.run("UPDATE Utilisateur SET token='"+token+"' WHERE id_utilisateur='"+rows[0].id_utilisateur+"'");
+        res.status(200).send(tokenObj);
+        }
       }
+      else {
+        res.status(400).send('identifiant ou mot de passe incorrect.');
+      }
+    });
+  })
+
+  //Disconnect
+  app.post('/disconnect', function (req, res) {
+    var token = req.body.token;
+
+    var id_utilisateur = checkToken(token);
+
+    if(id_utilisateur != false)
+    {
+      db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
+      res.status(201).send('ok');
     }
     else {
-      res.status(400).send('identifiant ou mot de passe incorrect.');
+      res.status(401).send("Erreur!");
     }
-  });
-})
+  })
 
-//Disconnect
-app.post('/disconnect', function (req, res) {
-  var token = req.body.token;
+  //Delete account
+  app.delete('/delete', function (req, res) {
+    var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
+    var id_utilisateur = checkToken(token);
 
-  if(id_utilisateur != false)
+    if(id_utilisateur != false)
+    {
+      db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
+        res.status(200).send('ok');
+      });
+    }
+    else {
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+  })
+
+  function generateCode()
   {
-    db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
-    res.status(201).send('ok');
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    var codeGenerate = '';
+    for(var i = 0; i< 8; i++)
+    {
+      var nbAlea = Math.random()*25;
+      codeGenerate += characters.charAt(nbAlea);
+    }
+    return  codeGenerate;
   }
-  else {
-    res.status(401).send("Erreur!");
-  }
-})
 
-//Delete account
-app.delete('/delete', function (req, res) {
-  var token = req.body.token;
-
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
+  function generateToken()
   {
-    db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
-      res.status(200).send('ok');
+    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+    var tokenGenerate = '';
+    for(var i = 0; i< 20; i++)
+    {
+      var nbAlea = Math.random()*25;
+      tokenGenerate += characters.charAt(nbAlea);
+    }
+    return  tokenGenerate;
+  }
+  //TODO IMPLEMENTE ALL FUNCTION USING TOKEN INSTEAD OF USER ID
+  function checkToken(token)
+  {
+    //We check if the token is in the database
+    db.all("SELECT id_utilisateur FROM Utilisateur WHERE token="+token,function(err,rows){
+      if(rows === undefined || rows.length == 0)
+      {
+        //The token is not in the database
+        return false;
+      }
+      else {
+        //The token is in the database
+        return rows[0].id_utilisateur;
+      }
     });
   }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
-})
 
-function generateCode()
-{
-  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  var codeGenerate = '';
-  for(var i = 0; i< 8; i++)
-  {
-    var nbAlea = Math.random()*25;
-    codeGenerate += characters.charAt(nbAlea);
-  }
-  return  codeGenerate;
-}
-
-function generateToken()
-{
-  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
-  var tokenGenerate = '';
-  for(var i = 0; i< 20; i++)
-  {
-    var nbAlea = Math.random()*25;
-    tokenGenerate += characters.charAt(nbAlea);
-  }
-  return  tokenGenerate;
-}
-//TODO IMPLEMENTE ALL FUNCTION USING TOKEN INSTEAD OF USER ID
-function checkToken(token)
-{
-  //We check if the token is in the database
-  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token="+token,function(err,rows){
-    if(rows === undefined || rows.length == 0)
-    {
-      //The token is not in the database
-      return false;
-    }
-    else {
-      //The token is in the database
-      return rows[0].id_utilisateur;
-    }
-  });
-}
-
-app.listen(3000, function () {
-  console.log('Your incredible app is listening on port 3000!');
-})
+  app.listen(3000, function () {
+    console.log('Your incredible app is listening on port 3000!');
+  })
 
 
 
-//Perform SELECT Operation
-//db.all("SELECT * from blah blah blah where this="+that,function(err,rows){
-//rows contain values while errors, well you can figure out.
-//});
+  //Perform SELECT Operation
+  //db.all("SELECT * from blah blah blah where this="+that,function(err,rows){
+  //rows contain values while errors, well you can figure out.
+  //});
 
-//Perform INSERT operation.
+  //Perform INSERT operation.
 
-//Perform DELETE operation
-//db.run("DELETE * from table_name where condition");
+  //Perform DELETE operation
+  //db.run("DELETE * from table_name where condition");
 
-//Perform UPDATE operation
-//db.run("UPDATE table_name where condition");
+  //Perform UPDATE operation
+  //db.run("UPDATE table_name where condition");
