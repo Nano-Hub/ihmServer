@@ -129,27 +129,31 @@ app.get('/getAllCouponsFromStore', function (req, res) {
 
 //select all  my coupon
 app.get('/getMyCoupons', function (req, res) {
-  var token = req.body.token;
+  var token = req.query.token;
 
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
-  {
-    //type = 0 mycoupon
-    db.all("SELECT nom, reduction, delai FROM Coupon_utilisateur JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE id_utilisateur='"+id_utilisateur+"' AND type=0",function(err,rows){
-      if(rows !== undefined)
-      {
-        res.status(200).send(rows);
-      }
-      else
-      {
-        res.status(400).send(err);
-      }
-    });
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      //The token is in the database
+      //type = 0 mycoupon
+      var id_utilisateur = rows[0].id_utilisateur;
+      console.log(id_utilisateur);
+      db.all("SELECT nom, reduction, delai, Coupon_utilisateur.id_coupon FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE Coupon_utilisateur.id_utilisateur='"+id_utilisateur+"' AND type=0",function(errMag,rowsMag){
+        if(rowsMag !== undefined)
+        {
+          res.status(200).send(rowsMag);
+        }
+        else
+        {
+          res.status(400).send(errMag);
+        }
+      });
+    }
+  });
 })
 
 //insert new coupon from a user
@@ -210,22 +214,82 @@ app.get('/getAllCouponsFromUser', function (req, res) {
   });
 })
 
+//select all coupons from user
+app.get('/getAllCouponsOfferedByUser', function (req, res) {
+  var token = req.query.token;
+
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(400).send(err);
+    }
+    else {
+      //The token is in the database
+      var id_utilisateur = rows[0].id_utilisateur;
+      //type = 1 , coupon offered by user
+      console.log(id_utilisateur);
+      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1 AND id_utilisateur='"+id_utilisateur+"'",function(errOffer,rowsOffer){
+        if(rowsOffer !== undefined)
+        {
+          res.status(200).send(rowsOffer);
+        }
+        else
+        {
+          res.status(400).send(errOffer);
+        }
+      });
+    }
+  });
+})
+
+//select all coupons from user
+app.get('/getAllCouponsAskedByUser', function (req, res) {
+  var token = req.query.token;
+
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(400).send(err);
+    }
+    else {
+      //The token is in the database
+      var id_utilisateur = rows[0].id_utilisateur;
+      //type = 1 , coupon offered by user
+      console.log(id_utilisateur);
+      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=2 AND id_utilisateur='"+id_utilisateur+"'",function(errOffer,rowsOffer){
+        if(rowsOffer !== undefined)
+        {
+          res.status(200).send(rowsOffer);
+        }
+        else
+        {
+          res.status(400).send(errOffer);
+        }
+      });
+    }
+  });
+})
+
 //insert new coupon from a user (give a coupon)
 app.post('/addCouponFromUser', function (req, res) {
   var id_coupon = req.body.id_coupon;
   var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
-  {
-    // type = 1 coupon offered by user
-    db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
-    res.status(201).send("ok");
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      var id_utilisateur = rows[0].id_utilisateur;
+      // type = 1 coupon offered by user
+      db.run("UPDATE Coupon_utilisateur SET type=1 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
+      res.status(201).send("ok");
+    }
+  });
 })
 
 //ask for a coupon
@@ -238,6 +302,7 @@ app.post('/askCoupon', function (req, res) {
   if(id_utilisateur != false)
   {
     // type = 2 coupon asked
+    //faux cest un insrrt into
     db.run("UPDATE Coupon_utilisateur SET type=2 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
     res.status(201).send("ok");
     //TODO CORRIGER
@@ -314,102 +379,105 @@ app.post('/login', function (req, res) {
         };
         db.run("UPDATE Utilisateur SET token='"+token+"' WHERE id_utilisateur='"+rows[0].id_utilisateur+"'");
         res.status(200).send(tokenObj);
-        }
       }
-      else {
-        res.status(400).send('identifiant ou mot de passe incorrect.');
-      }
-    });
-  })
-
-  //Disconnect
-  app.post('/disconnect', function (req, res) {
-    var token = req.body.token;
-
-    var id_utilisateur = checkToken(token);
-
-    if(id_utilisateur != false)
-    {
-      db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
-      res.status(201).send('ok');
     }
     else {
-      res.status(401).send("Erreur!");
+      res.status(400).send('identifiant ou mot de passe incorrect.');
     }
-  })
+  });
+})
 
-  //Delete account
-  app.delete('/delete', function (req, res) {
-    var token = req.body.token;
+//Disconnect
+app.post('/disconnect', function (req, res) {
+  var token = req.body.token;
 
-    var id_utilisateur = checkToken(token);
+  var id_utilisateur = checkToken(token);
 
-    if(id_utilisateur != false)
-    {
-      db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
-        res.status(200).send('ok');
-      });
-    }
-    else {
-      res.status(401).send("Erreur: reconnectez-vous!");
-    }
-  })
-
-  function generateCode()
+  if(id_utilisateur != false)
   {
-    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    var codeGenerate = '';
-    for(var i = 0; i< 8; i++)
-    {
-      var nbAlea = Math.random()*25;
-      codeGenerate += characters.charAt(nbAlea);
-    }
-    return  codeGenerate;
+    db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
+    res.status(201).send('ok');
   }
-
-  function generateToken()
-  {
-    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
-    var tokenGenerate = '';
-    for(var i = 0; i< 20; i++)
-    {
-      var nbAlea = Math.random()*25;
-      tokenGenerate += characters.charAt(nbAlea);
-    }
-    return  tokenGenerate;
+  else {
+    res.status(401).send("Erreur!");
   }
-  //TODO IMPLEMENTE ALL FUNCTION USING TOKEN INSTEAD OF USER ID
-  function checkToken(token)
+})
+
+//Delete account
+app.delete('/delete', function (req, res) {
+  var token = req.body.token;
+
+  var id_utilisateur = checkToken(token);
+
+  if(id_utilisateur != false)
   {
-    //We check if the token is in the database
-    db.all("SELECT id_utilisateur FROM Utilisateur WHERE token="+token,function(err,rows){
-      if(rows === undefined || rows.length == 0)
-      {
-        //The token is not in the database
-        return false;
-      }
-      else {
-        //The token is in the database
-        return rows[0].id_utilisateur;
-      }
+    db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
+      res.status(200).send('ok');
     });
   }
+  else {
+    res.status(401).send("Erreur: reconnectez-vous!");
+  }
+})
 
-  app.listen(3000, function () {
-    console.log('Your incredible app is listening on port 3000!');
-  })
+function generateCode()
+{
+  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var codeGenerate = '';
+  for(var i = 0; i< 8; i++)
+  {
+    var nbAlea = Math.random()*25;
+    codeGenerate += characters.charAt(nbAlea);
+  }
+  return  codeGenerate;
+}
+
+function generateToken()
+{
+  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+  var tokenGenerate = '';
+  for(var i = 0; i< 20; i++)
+  {
+    var nbAlea = Math.random()*25;
+    tokenGenerate += characters.charAt(nbAlea);
+  }
+  return  tokenGenerate;
+}
+//TODO IMPLEMENTE ALL FUNCTION USING TOKEN INSTEAD OF USER ID
+function checkToken(token)
+{
+  //We check if the token is in the database
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    console.log(rows);
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      console.log("1");
+      return false;
+    }
+    else {
+      //The token is in the database
+      console.log("2");
+      return rows[0].id_utilisateur;
+    }
+  });
+}
+
+app.listen(3000, function () {
+  console.log('Your incredible app is listening on port 3000!');
+})
 
 
 
-  //Perform SELECT Operation
-  //db.all("SELECT * from blah blah blah where this="+that,function(err,rows){
-  //rows contain values while errors, well you can figure out.
-  //});
+//Perform SELECT Operation
+//db.all("SELECT * from blah blah blah where this="+that,function(err,rows){
+//rows contain values while errors, well you can figure out.
+//});
 
-  //Perform INSERT operation.
+//Perform INSERT operation.
 
-  //Perform DELETE operation
-  //db.run("DELETE * from table_name where condition");
+//Perform DELETE operation
+//db.run("DELETE * from table_name where condition");
 
-  //Perform UPDATE operation
-  //db.run("UPDATE table_name where condition");
+//Perform UPDATE operation
+//db.run("UPDATE table_name where condition");
