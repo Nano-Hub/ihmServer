@@ -28,24 +28,31 @@ app.use(allowCrossDomain);
 
 //createMagasin
 app.post('/createStore', function (req, res) {
-  var nom_magasin = req.body.nom_magasin;
+  var token = req.body.token;
+  var nom = req.body.nom;
 
-  //Check if magasin exist already
-  db.all("SELECT * FROM Magasin WHERE nom='"+nom_magasin+"'",function(err,rows){
-    if(rows !== undefined && rows.length == 0)
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
     {
-      //Genere code for magasin admin to give to magasin owner
-      var code = generateCode();
-      //insert the new store with a code
-      db.run("INSERT into Magasin(nom,code,image) VALUES ('"+nom_magasin+"','"+code+"','null')");
-      db.all("SELECT id_magasin FROM Magasin WHERE nom='"+nom_magasin+"'",function(err,rows){
-        db.run("INSERT into Coupon(reduction,delai,quantite, id_magasin) VALUES (-1,-1,-1,'"+rows[0].id_magasin+"')");
-      })
-      res.status(200).send('ok');
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
     }
-    else //if the store already exists
-    {
-      res.status(400).send('Store already exist');
+    else {
+      var id_utilisateur = rows[0].id_utilisateur;
+      //We check if the user own a store
+      db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rowsMaga){
+        if(rowsMaga.length !== 0)
+        {
+          //Genere code for magasin admin to give to magasin owner
+          var code = generateCode();
+          //insert the new store with a code
+          db.run("INSERT into Magasin(nom,code,image) VALUES ('"+nom+"','"+code+"','null')");
+          db.all("SELECT id_magasin FROM Magasin WHERE nom='"+nom+"'",function(err,rows){
+            db.run("INSERT into Coupon(reduction,delai,quantite, id_magasin) VALUES (-1,-1,-1,'"+rowsMaga[0].id_magasin+"')");
+          })
+          res.status(200).send('ok');
+        }
+      });
     }
   });
 })
@@ -57,58 +64,106 @@ app.post('/addCouponFromStore', function (req, res) {
   var quantite = req.body.quantite;
   var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
-  {
-    //We check if the user own a store
-    db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rows){
-      if(rows[0].id_magasin !== "null")
-      {
-        db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+id_magasin+"')");
-        res.status(200).send("ok");
-      }
-    });
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
-
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      var id_utilisateur = rows[0].id_utilisateur;
+      //We check if the user own a store
+      db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rowsMaga){
+        if(rowsMaga.length !== 0)
+        {
+          db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+rowsMaga[0].id_magasin+"')");
+          res.status(200).send("ok");
+        }
+        else {
+          res.status(400).send("Erreur");
+        }
+      });
+    }
+  });
 })
 
 //delete a coupon in store
 app.delete('/deleteCouponFromStore', function (req, res) {
-  var id_coupon = req.body.id_magasin;
-  var token = req.body.token;
+  var id_coupon = req.query.id_coupon;
+  var token = req.query.token;
 
-  var id_utilisateur = checkToken(token);
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      var id_utilisateur = rows[0].id_utilisateur;
+      //We check if the user is the owner of the store
+      db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rowsMaga){
+        console.log(rowsMaga);
+        if(rowsMaga.length !== 0)
+        {
+          //We check if the coupon is for THIS store
+          db.all("SELECT id_magasin FROM Coupon WHERE id_coupon='"+id_coupon+"'",function(err,rowsCoupon){
+            if(rowsCoupon.length !==0 && rowsCoupon[0].id_magasin === rowsMaga[0].id_magasin)
+            {
+              db.run("DELETE FROM Coupon WHERE id_coupon ="+id_coupon);
+              res.status(200).send("Coupon supprimé");
+            }
+            else {
+              res.status(400).send("Le coupon n'appartient a votre magasin.");
+            }
+          });
+        }
+        else {
+          res.status(400).send("Ce magasin n'est pas le votre!");
+        }
+      });
+    }
+  });
+})
 
-  if(id_utilisateur != false)
-  {
-    //We check if the user is the owner of the store
-    db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rows){
-      if(rows[0].id_magasin !== "null")
-      {
-        //We check if the coupon is for THIS store
-        db.all("SELECT id_magasin FROM Coupon WHERE id_coupon='"+id_coupon+"'",function(err,rowsCoupon){
-          if(rowsCoupon[0].id_magasin !== undefined && rowsCoupon[0].id_magasin == rows[0].id_magasin !== "null")
-          {
-            db.run("DELETE FROM Coupon WHERE id_coupon ='"+id_coupon);
-            res.status(200).send("Coupon supprimé");
-          }
-          else {
-            res.status(400).send("Le coupon n'appartient a votre magasin.");
-          }
-        });
-      }
-      else {
-        res.status(400).send("Ce magasin n'est pas le votre!");
-      }
-    });
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
+//select all coupons from our store
+app.get('/getAllCouponsFromOurStore', function (req, res) {
+  var token = req.query.token;
+
+  db.all("SELECT id_magasin FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      console.log(rows[0].id_magasin);
+      var id_magasin = rows[0].id_magasin;
+      db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE Coupon.id_magasin="+id_magasin,function(err2,rows2){
+        if(rows2 !== undefined && rows2.length !== 0)
+        {
+          res.status(200).send(rows2);
+        }
+        else
+        {
+          res.status(400).send("Erreur!");
+        }
+      });
+    }
+  });
+})
+
+//select all coupons from our store
+app.get('/getAllStore', function (req, res) {
+  db.all("SELECT nom,code,image FROM Magasin",function(err2,rows2){
+    if(rows2 !== undefined && rows2.length !== 0)
+    {
+      res.status(200).send(rows2);
+    }
+    else
+    {
+      res.status(400).send("Erreur!");
+    }
+  });
 })
 
 //-----------------------------------USER METHOD--FIRST MARKET--------------------------
@@ -142,7 +197,7 @@ app.get('/getMyCoupons', function (req, res) {
       //type = 0 mycoupon
       var id_utilisateur = rows[0].id_utilisateur;
       console.log(id_utilisateur);
-      db.all("SELECT nom, reduction, delai, Coupon_utilisateur.id_coupon FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE Coupon_utilisateur.id_utilisateur='"+id_utilisateur+"' AND type=0",function(errMag,rowsMag){
+      db.all("SELECT nom, reduction, delai, Coupon_utilisateur.id_coupon, image FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE Coupon_utilisateur.id_utilisateur='"+id_utilisateur+"' AND type=0",function(errMag,rowsMag){
         if(rowsMag !== undefined)
         {
           res.status(200).send(rowsMag);
@@ -207,7 +262,7 @@ app.post('/takeCoupon', function (req, res) {
 app.get('/getAllCouponsFromUser', function (req, res) {
   //TODO NEED SECURITY CHECK IF USER HAS COUPON
   //type = 1 , coupon offered by user
-  db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
+  db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai, image FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
     if(rows !== undefined)
     {
       res.status(200).send(rows);
@@ -227,16 +282,17 @@ app.get('/getAllCouponsOfferedByUser', function (req, res) {
     if(rows === undefined || rows.length === 0)
     {
       //The token is not in the database
-      res.status(400).send(err);
+      res.status(400).send("Reconnectez-vous!");
     }
     else {
       //The token is in the database
       var id_utilisateur = rows[0].id_utilisateur;
       //type = 1 , coupon offered by user
       console.log(id_utilisateur);
-      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1 AND id_utilisateur='"+id_utilisateur+"'",function(errOffer,rowsOffer){
+      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai, image FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1 AND id_utilisateur='"+id_utilisateur+"'",function(errOffer,rowsOffer){
         if(rowsOffer !== undefined)
         {
+          console.log(rowsOffer);
           res.status(200).send(rowsOffer);
         }
         else
@@ -248,15 +304,47 @@ app.get('/getAllCouponsOfferedByUser', function (req, res) {
   });
 })
 
-//select all coupons from user
-app.get('/getAllCouponsAskedByUser', function (req, res) {
+app.get('/userType', function (req, res) {
   var token = req.query.token;
 
   db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
     if(rows === undefined || rows.length === 0)
     {
       //The token is not in the database
-      res.status(400).send(err);
+      res.status(400).send("Reconnectez-vous!");
+    }
+    else {
+      //The token is in the database
+      var id_utilisateur = rows[0].id_utilisateur;
+      //type = 1 , coupon offered by user
+      db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(errOffer,rowsOffer){
+
+        if(rowsOffer.length !== 0)
+        {
+          var magaObj =
+          {
+            type: rowsOffer[0].id_magasin
+          };
+          res.status(200).send(magaObj);
+        }
+        else
+        {
+          res.status(400).send("errOffer");
+        }
+      });
+    }
+  });
+})
+
+//select all coupons from one user
+app.get('/getCouponsAskedByUser', function (req, res) {
+  var token = req.query.token;
+
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(400).send("Reconnectez-vous!");
     }
     else {
       //The token is in the database
@@ -273,6 +361,21 @@ app.get('/getAllCouponsAskedByUser', function (req, res) {
           res.status(400).send(errOffer);
         }
       });
+    }
+  });
+})
+
+//select all coupons from all user
+app.get('/getAllCouponsAskedByUser', function (req, res) {
+
+  db.all("SELECT Coupon_utilisateur.id_coupon, Magasin.nom FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=2",function(errOffer,rowsOffer){
+    if(rowsOffer !== undefined)
+    {
+      res.status(200).send(rowsOffer);
+    }
+    else
+    {
+      res.status(400).send(errOffer);
     }
   });
 })
@@ -319,28 +422,33 @@ app.post('/stopGivingCoupon', function (req, res) {
 
 //ask for a coupon
 app.post('/askCoupon', function (req, res) {
-  var nom_magasin = req.body.nom_magasin;
+  var id_magasin = req.body.id_magasin;
   var token = req.body.token;
 
-  var id_utilisateur = checkToken(token);
-
-  if(id_utilisateur != false)
-  {
-    // type = 2 coupon asked
-    //faux cest un insrrt into
-    db.run("UPDATE Coupon_utilisateur SET type=2 WHERE id_coupon='"+id_coupon+"' AND id_utilisateur='"+id_utilisateur+"'");
-    res.status(201).send("ok");
-    //TODO CORRIGER
-  }
-  else {
-    res.status(401).send("Erreur: reconnectez-vous!");
-  }
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(401).send("Erreur: reconnectez-vous!");
+    }
+    else {
+      var id_utilisateur = rows[0].id_utilisateur;
+      // type = 2 coupon asked
+      db.all("SELECT id_coupon FROM Coupon WHERE reduction=-1 AND id_magasin='"+id_magasin+"'",function(err,rowsCoupon){
+        if(rowsCoupon === undefined || rowsCoupon.length === 0)
+        {
+          db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur, type)  VALUES('"+id_coupon+"','"+id_utilisateur+"', 2)"); //0 = my coupon
+          res.status(201).send("ok");
+        }
+      });
+    }
+  });
 })
 
 //get all offer that can be asked
 app.get('/getPossibleAskedOffer', function (req, res) {
   // type = 2 coupon asked && reduction - 1 = coupon pré-crée
-  db.all("SELECT id_magasin, nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE reduction=-1",function(err,rows){
+  db.all("SELECT Magasin.id_magasin, Magasin.nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE Coupon.reduction=-1",function(err,rows){
     res.status(200).send(rows);
   })
 })
@@ -388,7 +496,7 @@ app.post('/login', function (req, res) {
     {
       //Si les informations de connexion sont bonnes
       console.log(rows[0].token);
-      if(rows[0].token !== "NULL")
+      if(rows[0].token !== "null")
       {
         var tokenObj =
         {
@@ -415,7 +523,7 @@ app.post('/login', function (req, res) {
 //Disconnect
 app.post('/disconnect', function (req, res) {
   var token = req.body.token;
-
+  console.log("mytoken ="+token);
   db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
     if(rows === undefined || rows.length === 0)
     {
@@ -424,6 +532,7 @@ app.post('/disconnect', function (req, res) {
     }
     else
     {
+      var id_utilisateur = rows[0].id_utilisateur;
       db.run("UPDATE Utilisateur SET token='"+null+"' WHERE id_utilisateur='"+id_utilisateur+"'");
       res.status(201).send('ok');
     }
@@ -432,9 +541,10 @@ app.post('/disconnect', function (req, res) {
 
 //Delete account
 app.delete('/delete', function (req, res) {
-  var token = req.body.token;
-
+  var token = req.query.token;
+  console.log("tok"+token);
   db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    console.log(rows);
     if(rows === undefined || rows.length === 0)
     {
       //The token is not in the database
@@ -444,7 +554,8 @@ app.delete('/delete', function (req, res) {
     {
       //The token is in the database
       var id_utilisateur = rows[0].id_utilisateur;
-      db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(err,rows){
+      console.log("delete");
+      db.all("DELETE FROM Utilisateur WHERE id_utilisateur="+id_utilisateur,function(errDelete,rowsDelete){
         res.status(200).send('ok');
       });
     }
