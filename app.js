@@ -77,9 +77,9 @@ app.post('/addCouponFromStore', function (req, res) {
         if(rowsMaga.length !== 0)
         {
           if(delai === "")
-            delai = "-1";
+          delai = "-1";
           if(quantite === "")
-            quantite = "-1";
+          quantite = "-1";
 
           db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+rowsMaga[0].id_magasin+"')");
           res.status(200).send("ok");
@@ -265,16 +265,28 @@ app.post('/takeCoupon', function (req, res) {
 
 //select all coupons from user
 app.get('/getAllCouponsFromUser', function (req, res) {
-  //TODO NEED SECURITY CHECK IF USER HAS COUPON
-  //type = 1 , coupon offered by user
-  db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai, image FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1",function(err,rows){
-    if(rows !== undefined)
+  var token = req.query.token;
+
+  db.all("SELECT id_utilisateur FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
     {
-      res.status(200).send(rows);
+      //The token is not in the database
+      res.status(400).send("Reconnectez-vous!");
     }
-    else
-    {
-      res.status(400).send(err);
+    else {
+      //The token is in the database
+      var id_utilisateur = rows[0].id_utilisateur;
+      //type = 1 , coupon offered by user
+      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai, image FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=1 AND id_utilisateur!="+id_utilisateur,function(err,rows){
+        if(rows !== undefined)
+        {
+          res.status(200).send(rows);
+        }
+        else
+        {
+          res.status(400).send(err);
+        }
+      });
     }
   });
 })
@@ -326,11 +338,33 @@ app.get('/userType', function (req, res) {
 
         if(rowsOffer.length !== 0)
         {
-          var magaObj =
+
+          if(id_utilisateur == 1)
           {
-            type: rowsOffer[0].id_magasin
-          };
-          res.status(200).send(magaObj);
+            var magaObj =
+            {
+              type: "admin"
+            };
+            res.status(200).send(magaObj);
+          }
+          else {
+            if(rowsOffer[0].id_magasin == -1)
+            {
+              var magaObj =
+              {
+                type: "user"
+              };
+              res.status(200).send(magaObj);
+            }
+            else {
+              var magaObj =
+              {
+                type: "gerant"
+              };
+              res.status(200).send(magaObj);
+            }
+          }
+
         }
         else
         {
@@ -486,6 +520,28 @@ app.post('/register', function (req, res) {
       }
     })
   }
+})
+
+
+app.get('/getIdUser', function (req, res) {
+  var token = req.query.token;
+
+  db.all("SELECT identifiant FROM Utilisateur WHERE token='"+token+"'",function(err,rows){
+    if(rows === undefined || rows.length === 0)
+    {
+      //The token is not in the database
+      res.status(400).send("Reconnectez-vous!");
+    }
+    else
+    {
+      var tokenObj =
+      {
+        id: rows[0].identifiant
+      };
+      console.log(tokenObj);
+      res.status(200).send(tokenObj);
+    }
+  });
 })
 
 //Connexion
