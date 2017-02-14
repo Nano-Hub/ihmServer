@@ -46,7 +46,7 @@ app.post('/createStore', function (req, res) {
           //Genere code for magasin admin to give to magasin owner
           var code = generateCode();
           //insert the new store with a code
-          db.run("INSERT into Magasin(nom,code,image) VALUES ('"+nom+"','"+code+"','null')");
+          db.run("INSERT into Magasin(nom,code,image) VALUES ('"+nom+"','"+code+"','assets/img/default.png')");
           db.all("SELECT id_magasin FROM Magasin WHERE nom='"+nom+"'",function(err,rows){
             db.run("INSERT into Coupon(reduction,delai,quantite, id_magasin) VALUES (-1,-1,-1,'"+rowsMaga[0].id_magasin+"')");
           })
@@ -76,6 +76,11 @@ app.post('/addCouponFromStore', function (req, res) {
       db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rowsMaga){
         if(rowsMaga.length !== 0)
         {
+          if(delai === "")
+            delai = "-1";
+          if(quantite === "")
+            quantite = "-1";
+
           db.run("INSERT INTO Coupon (reduction,delai,quantite,id_magasin) VALUES ('"+reduction+"','"+delai+"','"+quantite+"', '"+rowsMaga[0].id_magasin+"')");
           res.status(200).send("ok");
         }
@@ -138,7 +143,7 @@ app.get('/getAllCouponsFromOurStore', function (req, res) {
     else {
       console.log(rows[0].id_magasin);
       var id_magasin = rows[0].id_magasin;
-      db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE Coupon.id_magasin="+id_magasin,function(err2,rows2){
+      db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE reduction != -1 AND Coupon.id_magasin="+id_magasin,function(err2,rows2){
         if(rows2 !== undefined && rows2.length !== 0)
         {
           res.status(200).send(rows2);
@@ -170,7 +175,7 @@ app.get('/getAllStore', function (req, res) {
 //select all coupons from store
 app.get('/getAllCouponsFromStore', function (req, res) {
 
-  db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin",function(err,rows){
+  db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE quantite > 0 AND reduction != -1",function(err,rows){
     if(rows !== undefined)
     {
       res.status(200).send(rows);
@@ -351,7 +356,7 @@ app.get('/getCouponsAskedByUser', function (req, res) {
       var id_utilisateur = rows[0].id_utilisateur;
       //type = 1 , coupon offered by user
       console.log(id_utilisateur);
-      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=2 AND id_utilisateur='"+id_utilisateur+"'",function(errOffer,rowsOffer){
+      db.all("SELECT Coupon_utilisateur.id_coupon, nom, reduction, delai, image FROM Coupon_utilisateur JOIN Coupon ON Coupon.id_coupon = Coupon_utilisateur.id_coupon JOIN Magasin ON Magasin.id_magasin = Coupon.id_magasin WHERE type=2 AND id_utilisateur='"+id_utilisateur+"'",function(errOffer,rowsOffer){
         if(rowsOffer !== undefined)
         {
           res.status(200).send(rowsOffer);
@@ -448,7 +453,7 @@ app.post('/askCoupon', function (req, res) {
 //get all offer that can be asked
 app.get('/getPossibleAskedOffer', function (req, res) {
   // type = 2 coupon asked && reduction - 1 = coupon pré-crée
-  db.all("SELECT Magasin.id_magasin, Magasin.nom FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE Coupon.reduction=-1",function(err,rows){
+  db.all("SELECT Magasin.id_magasin, Magasin.nom, Magasin.image FROM Magasin JOIN Coupon ON Coupon.id_magasin = Magasin.id_magasin WHERE Coupon.reduction=-1",function(err,rows){
     res.status(200).send(rows);
   })
 })
