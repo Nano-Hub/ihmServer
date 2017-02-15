@@ -39,20 +39,14 @@ app.post('/createStore', function (req, res) {
     }
     else {
       var id_utilisateur = rows[0].id_utilisateur;
-      //We check if the user own a store
-      db.all("SELECT id_magasin FROM Utilisateur WHERE id_utilisateur='"+id_utilisateur+"'",function(err,rowsMaga){
-        if(rowsMaga.length !== 0)
-        {
           //Genere code for magasin admin to give to magasin owner
           var code = generateCode();
           //insert the new store with a code
           db.run("INSERT into Magasin(nom,code,image) VALUES ('"+nom+"','"+code+"','assets/img/default.png')");
           db.all("SELECT id_magasin FROM Magasin WHERE nom='"+nom+"'",function(err,rows){
-            db.run("INSERT into Coupon(reduction,delai,quantite, id_magasin) VALUES (-1,-1,-1,'"+rowsMaga[0].id_magasin+"')");
+            db.run("INSERT into Coupon(reduction,delai,quantite, id_magasin) VALUES (-1,-1,-1,'"+rows[0].id_magasin+"')");
           })
           res.status(200).send('ok');
-        }
-      });
     }
   });
 })
