@@ -501,7 +501,7 @@ app.post('/register', function (req, res) {
 
   var token = generateToken();
 
-  if(code_magasin == "null")
+  if(code_magasin == "")
   {
     db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin, token) VALUES ('"+identifiant+"','"+mot_de_passe+"','-1', '"+token+"')");
     res.status(200).send("ok");
