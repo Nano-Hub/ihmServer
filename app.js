@@ -150,7 +150,7 @@ app.get('/getAllCouponsFromOurStore', function (req, res) {
         }
         else
         {
-          res.status(400).send("Erreur!");
+          res.status(400).send("Vous n'avez pas de coupons");
         }
       });
     }
@@ -175,7 +175,7 @@ app.get('/getAllStore', function (req, res) {
 //select all coupons from store
 app.get('/getAllCouponsFromStore', function (req, res) {
 
-  db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE quantite > 0 AND reduction != -1",function(err,rows){
+  db.all("SELECT nom, reduction, delai, quantite, image, id_coupon FROM Coupon JOIN Magasin ON Coupon.id_magasin = Magasin.id_magasin WHERE quantite > 0 OR quantite == -1 AND reduction != -1",function(err,rows){
     if(rows !== undefined)
     {
       res.status(200).send(rows);
@@ -241,8 +241,12 @@ app.post('/takeCoupon', function (req, res) {
           db.all("SELECT id_coupon FROM Coupon_utilisateur WHERE id_utilisateur="+id_utilisateur+" AND id_coupon="+id_coupon+";",function(err,rowsCoupon){
             if(rowsCoupon.length === 0)
             {
+
+              if(quantite > 0)
+              {
               quantite -= 1; //We get one
               db.run("UPDATE Coupon SET quantite='"+quantite+"' WHERE id_coupon='"+id_coupon+"'");
+              }
               //We add the coupon in our user database
               db.run("INSERT INTO Coupon_utilisateur(id_coupon, id_utilisateur, type)  VALUES('"+id_coupon+"','"+id_utilisateur+"', 0)"); //0 = my coupon
               res.status(201).send("ok");
@@ -509,8 +513,8 @@ app.post('/register', function (req, res) {
   else
   {
     //Obtenir le magasin correspondant au code ou retourner null
-    db.all("SELECT id_magasin FROM Magasin WHERE code="+code_magasin,function(err,rows){
-      if(rows.length !== 0)
+    db.all("SELECT id_magasin FROM Magasin WHERE code='"+code_magasin+"'",function(err,rows){
+      if(rows !== undefined && rows.length !== 0)
       {
         db.run("INSERT into Utilisateur(identifiant,mot_de_passe,id_magasin,token) VALUES ('"+identifiant+"','"+mot_de_passe+"','"+rows[0].id_magasin+"', '"+token+"')");
         res.status(200).send("ok");
